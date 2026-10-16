@@ -21,6 +21,15 @@
   #credit{position:absolute;right:8px;bottom:6px;font-size:11px;color:#8fa0b8}
   #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;pointer-events:none}
   body.shot .panel,body.shot #loading{display:none}
+  #toggle{float:right;background:#1d2738;color:#dfe6f0;border:1px solid #33425c;border-radius:4px;padding:1px 8px;cursor:pointer;font-size:12px;margin-left:8px}
+  #ui.closed #menu{display:none}
+  #ui.closed h1{margin:0}
+  @media (max-width:600px){
+    #ui{left:8px;right:8px;width:auto;top:8px}
+    #info{left:8px;right:8px;width:auto;top:auto;bottom:34px}
+    #range{display:none}
+    #credit{left:8px;font-size:10px}
+  }
 </style>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -29,7 +38,8 @@
 </head>
 <body>
 <div id="ui" class="panel">
-  <h1>阪東橋 3Dマップ（1.5km 四方）</h1>
+  <h1>阪東橋 3Dマップ（1.5km 四方）<button id="toggle">たたむ</button></h1>
+  <div id="menu">
   <h2>表示するパーツ</h2>
   <div id="layers"></div>
   <h2>見る場所</h2>
@@ -41,6 +51,7 @@
   </div>
   <div id="help">操作：左ドラッグで回転／右ドラッグで移動／ホイールで拡大<br>建物をクリックすると高さを表示</div>
   <div id="stat">読み込み中…</div>
+  </div>
 </div>
 <div id="info" class="panel"></div>
 <div id="range" class="panel">範囲 北 35.444356／南 35.430836／西 139.616916／東 139.633438<br>中心 阪東橋駅 35.437596, 139.625177</div>
@@ -52,6 +63,12 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 
 const Q = new URLSearchParams(location.search);
+const ui = document.getElementById('ui'), tg = document.getElementById('toggle');
+const setMenu = open => { ui.classList.toggle('closed', !open); tg.textContent = open ? 'たたむ' : 'メニュー'; };
+setMenu(innerWidth > 600);
+tg.onclick = () => setMenu(ui.classList.contains('closed'));
+if (matchMedia('(pointer: coarse)').matches) document.getElementById('help').innerHTML =
+  '操作：1本指で回転／2本指で移動・拡大<br>建物をタップすると高さを表示';
 const DIR = Q.get('dir') || document.documentElement.dataset.dir;
 if (Q.has('shot')) document.body.classList.add('shot');
 const LAYERS = [
@@ -83,7 +100,7 @@ const VIEWS = {
 };
 function setView(k){ const [p,t]=VIEWS[k]||VIEWS.bird; camera.position.set(...p); controls.target.set(...t); controls.update(); }
 setView(Q.get('view') || 'bird');
-document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>setView(b.dataset.v));
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ setView(b.dataset.v); if (innerWidth <= 600) setMenu(false); });
 
 const loader = new GLTFLoader(), groups = {}, stat = document.getElementById('stat');
 let tris = 0, done = 0, failed = [];
