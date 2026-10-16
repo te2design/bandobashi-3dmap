@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ja" data-dir="output/glb_web" data-index="output/buildings_index.json">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>阪東橋 3Dマップ 確認ビューア</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0f17;color:#dfe6f0;font:13px/1.5 system-ui,sans-serif;overflow:hidden}
+  .panel{position:absolute;background:rgba(10,14,22,.85);padding:10px 12px;border-radius:8px}
+  #ui{top:10px;left:10px;width:250px}
+  #ui h1{font-size:14px;margin:0 0 6px}
+  #ui h2{font-size:12px;margin:10px 0 4px;color:#8fa0b8;font-weight:600}
+  #ui label{display:block;cursor:pointer}
+  .views button{margin:2px 2px 0 0;background:#1d2738;color:#dfe6f0;border:1px solid #33425c;border-radius:4px;padding:3px 7px;cursor:pointer;font-size:12px}
+  .views button:hover{background:#2a3850}
+  #stat,#help,.mono{color:#8fa0b8;font-size:12px}
+  #stat{margin-top:8px;white-space:pre-line}
+  #info{right:10px;top:10px;width:250px;display:none}
+  #info b{color:#fff}
+  #range{left:10px;bottom:28px;font-size:12px;color:#8fa0b8}
+  #credit{position:absolute;right:8px;bottom:6px;font-size:11px;color:#8fa0b8}
+  #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;pointer-events:none}
+  body.shot .panel,body.shot #loading{display:none}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="ui" class="panel">
+  <h1>阪東橋 3Dマップ（1.5km 四方）</h1>
+  <h2>表示するパーツ</h2>
+  <div id="layers"></div>
+  <h2>見る場所</h2>
+  <div class="views">
+    <button data-v="top">真上（全体）</button><button data-v="bird">鳥瞰</button>
+    <button data-v="street">駅前の車目線</button><button data-v="cross">交差点</button>
+    <button data-v="kariba">首都高（高架）</button><button data-v="keikyu">京急の高架</button>
+    <button data-v="hill">丘の坂道</button>
+  </div>
+  <div id="help">操作：左ドラッグで回転／右ドラッグで移動／ホイールで拡大<br>建物をクリックすると高さを表示</div>
+  <div id="stat">読み込み中…</div>
+</div>
+<div id="info" class="panel"></div>
+<div id="range" class="panel">範囲 北 35.444356／南 35.430836／西 139.616916／東 139.633438<br>中心 阪東橋駅 35.437596, 139.625177</div>
+<div id="loading">読み込み中…（約13MB）</div>
+<div id="credit">© OpenStreetMap contributors / 3D都市モデル（Project PLATEAU）横浜市（2024年度）/ 国土地理院 標高タイル</div>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const Q = new URLSearchParams(location.search);
+const DIR = Q.get('dir') || document.documentElement.dataset.dir;
+if (Q.has('shot')) document.body.classList.add('shot');
+const LAYERS = [
+  ['terrain','地形'],['water','水面（川・池）'],['roads','道路（車道・歩道・歩行者道）'],['markings','道路標示（白線・横断歩道など）'],
+  ['rail','線路'],['structures','高架の桁・橋脚'],['buildings','建物（PLATEAU）']];
+const HIDE = new Set((Q.get('hide')||'').split(',').filter(Boolean));
+
+const renderer = new THREE.WebGLRenderer({antialias:true, logarithmicDepthBuffer:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fb6cc);
+scene.fog = new THREE.Fog(0x9fb6cc, 2500, 5000);
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.5, 20000);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3328, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(-800, 1500, 600); scene.add(sun);
+
+// 座標：X=東, Y=標高(m), Z=南。原点＝阪東橋駅
+const VIEWS = {
+  top:    [[0, 1900, 1], [0,0,0]],
+  bird:   [[-750, 750, 1100], [0,0,0]],
+  street: [[25, 14, 40], [0,2,0]],
+  cross:  [[40, 45, 60], [0,0,0]],
+  kariba: [[700, 80, 330], [450,10,120]],
+  hill:   [[330, 90, 330], [640,40,620]],
+  keikyu: [[-120, 110, -40], [-260,10,-250]],
+};
+function setView(k){ const [p,t]=VIEWS[k]||VIEWS.bird; camera.position.set(...p); controls.target.set(...t); controls.update(); }
+setView(Q.get('view') || 'bird');
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>setView(b.dataset.v));
+
+const loader = new GLTFLoader(), groups = {}, stat = document.getElementById('stat');
+let tris = 0, done = 0, failed = [];
+window.__loaded = false;
+for (const [key,label] of LAYERS){
+  const id = 'cb_'+key;
+  document.getElementById('layers').insertAdjacentHTML('beforeend',
+    `<label><input type="checkbox" id="${id}" ${HIDE.has(key)?'':'checked'}> ${label}</label>`);
+  loader.load(`${DIR}/${key}.glb`, g=>{
+    g.scene.traverse(o=>{ if(o.isMesh){ tris += o.geometry.index ? o.geometry.index.count/3 : o.geometry.attributes.position.count/3; }});
+    groups[key]=g.scene; g.scene.visible = !HIDE.has(key); scene.add(g.scene);
+    document.getElementById(id).onchange=e=>g.scene.visible=e.target.checked;
+    finish();
+  }, undefined, ()=>{ failed.push(key); finish(); });
+}
+function finish(){
+  done++;
+  stat.textContent = `${done}/${LAYERS.length} 読み込み  三角形 ${Math.round(tris).toLocaleString()}` +
+    (failed.length ? `\n読み込み失敗：${failed.join(', ')}` : '');
+  if (done === LAYERS.length) { document.getElementById('loading').remove(); window.__loaded = true; }
+}
+
+// 建物クリック → PLATEAU の建物情報
+let bindex = null;
+fetch(document.documentElement.dataset.index).then(r=>r.json()).then(j=>bindex=j).catch(()=>{});
+const ray = new THREE.Raycaster(), info = document.getElementById('info');
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e=>down=[e.clientX,e.clientY]);
+renderer.domElement.addEventListener('pointerup', e=>{
+  if (!down || Math.hypot(e.clientX-down[0], e.clientY-down[1]) > 4 || !groups.buildings) return;
+  ray.setFromCamera(new THREE.Vector2(e.clientX/innerWidth*2-1, -e.clientY/innerHeight*2+1), camera);
+  const hit = ray.intersectObject(groups.buildings, true)[0];
+  if (!hit || !hit.object.geometry.attributes._bldg) { info.style.display='none'; return; }
+  const i = Math.round(hit.object.geometry.attributes._bldg.getX(hit.face.a));
+  const b = bindex && bindex[i];
+  info.style.display = 'block';
+  info.innerHTML = b ? `<b>建物 #${i}</b><br>高さ（実測）：<b>${b.height ?? '不明'} m</b><br>形の細かさ：LOD${b.lod}${b.lod===2?'（屋根の形あり）':'（箱形）'}<br><span class="mono">PLATEAU ID：${b.id}<br>区画：${b.mesh}</span>`
+                     : `建物 #${i}（一覧を読み込み中）`;
+});
+
+window.__setView = setView;
+window.__look = (p,t)=>{ camera.position.set(...p); controls.target.set(...t); controls.update(); };
+window.__show = (key,v)=>{ if(groups[key]) groups[key].visible=v; const cb=document.getElementById('cb_'+key); if(cb) cb.checked=v; };
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera);});
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+.DS_Store
+output/blender_stdout.txt
+scripts/__pycache__/
+site/glb/
+site/*.json

@@ -1,0 +1,6 @@
+/glb/*
+  Content-Type: model/gltf-binary
+  Cache-Control: public, max-age=3600
+  Access-Control-Allow-Origin: *
+/*.json
+  Access-Control-Allow-Origin: *

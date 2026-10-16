@@ -1,0 +1,39 @@
+OSM: 点 45872 線 9644 関係 7
+水面 6 面 / 緑地 52 面
+地形をつくる 151 x 151
+線: 591 道路 / 333 歩行者道 / 9 線路（トンネル含む）
+高架: 31 まとまり / 259 点
+交差点 539 / 信号 127
+建物を読み込む
+建物 8347 棟
+地形を道路の下へ下げた頂点 823
+地形を道路の下へ下げた頂点 0
+オブジェクトを作る
+  terrain: 頂点 22,801 / 面 45,000
+  terrain_skirt: 頂点 2,400 / 面 600
+  water: 頂点 160 / 面 148
+  road_surface: 頂点 53,221 / 面 30,590
+  road_sidewalk: 頂点 30,688 / 面 14,194
+  road_footpath: 頂点 15,686 / 面 7,510
+  marking_lane_white: 頂点 39,318 / 面 17,818
+  marking_center_yellow: 頂点 502 / 面 231
+  marking_crosswalk: 頂点 6,860 / 面 2,275
+  marking_stopline: 頂点 588 / 面 147
+  rail_bed: 頂点 1,298 / 面 646
+  rail_track: 頂点 2,596 / 面 1,292
+  structure_viaduct: 頂点 17,802 / 面 9,926
+  building_53391419: 頂点 9,920 / 面 5,897
+  building_53391429: 頂点 27,084 / 面 16,001
+  building_53391439: 頂点 10,040 / 面 5,871
+  building_53391510: 頂点 11,374 / 面 6,670
+  building_53391520: 頂点 30,058 / 面 17,870
+  building_53391530: 頂点 9,468 / 面 5,926
+保存: /Users/tetsu/Dropbox (個人)/作業中/Claude/阪東橋3Dマップ/output/bandobashi_3dmap.blend
+書き出し: terrain.glb  1.2 MB
+書き出し: water.glb  0.0 MB
+書き出し: roads.glb  5.6 MB
+書き出し: markings.glb  2.3 MB
+書き出し: rail.glb  0.1 MB
+書き出し: structures.glb  0.7 MB
+書き出し: buildings.glb  7.7 MB
+書き出し: bandobashi_all.glb  17.5 MB
