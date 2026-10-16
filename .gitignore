@@ -3,3 +3,4 @@ output/blender_stdout.txt
 scripts/__pycache__/
 site/glb/
 site/*.json
+output/check_log.txt

@@ -112,7 +112,7 @@ for (const [key,label] of LAYERS){
   loader.load(`${DIR}/${key}.glb`, g=>{
     g.scene.traverse(o=>{ if(o.isMesh){ tris += o.geometry.index ? o.geometry.index.count/3 : o.geometry.attributes.position.count/3; }});
     groups[key]=g.scene; g.scene.visible = !HIDE.has(key); scene.add(g.scene);
-    document.getElementById(id).onchange=e=>g.scene.visible=e.target.checked;
+    document.getElementById(id).onchange=e=>{ g.scene.visible=e.target.checked; if (key==='buildings' && !e.target.checked) info.style.display='none'; };
     finish();
   }, undefined, ()=>{ failed.push(key); finish(); });
 }
@@ -131,6 +131,7 @@ let down = null;
 renderer.domElement.addEventListener('pointerdown', e=>down=[e.clientX,e.clientY]);
 renderer.domElement.addEventListener('pointerup', e=>{
   if (!down || Math.hypot(e.clientX-down[0], e.clientY-down[1]) > 4 || !groups.buildings) return;
+  if (!groups.buildings.visible) { info.style.display='none'; return; }  // 非表示の建物には反応しない
   ray.setFromCamera(new THREE.Vector2(e.clientX/innerWidth*2-1, -e.clientY/innerHeight*2+1), camera);
   const hit = ray.intersectObject(groups.buildings, true)[0];
   if (!hit || !hit.object.geometry.attributes._bldg) { info.style.display='none'; return; }

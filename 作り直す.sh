@@ -1,6 +1,6 @@
 #!/bin/zsh
 # 阪東橋 3D マップを作り直す（data/ にある元データから。消えていればダウンロードし直す）
-set -e
+set -e -o pipefail
 cd "$(dirname "$0")"
 BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
 TMP=${TMPDIR:-/tmp}/bandobashi_raw
@@ -10,26 +10,33 @@ if [ ! -f data/osm_raw.json ]; then
   echo "OSM を取得…"
   BB=$(tr -d '\n' < data/bbox.txt)
   Q="[out:json][timeout:180];(way[\"highway\"]($BB);way[\"building\"]($BB);relation[\"building\"]($BB);way[\"railway\"]($BB);way[\"waterway\"]($BB);way[\"natural\"]($BB);relation[\"natural\"=\"water\"]($BB);way[\"landuse\"]($BB);way[\"leisure\"]($BB);relation[\"leisure\"]($BB);relation[\"landuse\"]($BB);relation[\"waterway\"=\"riverbank\"]($BB);node[\"highway\"~\"traffic_signals|crossing|stop\"]($BB););out body;>;out skel qt;"
-  curl -s -m 300 --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o data/osm_raw.json
+  # 失敗したときに壊れたファイルを残さないよう、一時ファイルに取ってから置き換える
+  curl -sf -m 300 --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o "$TMP/osm_raw.json"
+  python3 -c "import json,sys;json.load(open(sys.argv[1]))['elements']" "$TMP/osm_raw.json"
+  mv "$TMP/osm_raw.json" data/osm_raw.json
 fi
 if [ ! -f data/buildings.jsonl ]; then
   echo "PLATEAU 建物を取得（約1GB・作業後は一時フォルダに置いたまま）…"
   mkdir -p "$TMP/plateau_bldg"
-  (cd "$TMP/plateau_bldg" && xargs -n1 -P4 curl -s -O < "$OLDPWD/data/plateau_bldg_urls.txt")
-  python3 -I scripts/prep_plateau.py "$TMP/plateau_bldg" data/buildings.jsonl
+  (cd "$TMP/plateau_bldg" && xargs -n1 -P4 curl -sf -O < "$OLDPWD/data/plateau_bldg_urls.txt")
+  python3 -I scripts/prep_plateau.py "$TMP/plateau_bldg" "$TMP/buildings.jsonl"
+  mv "$TMP/buildings.jsonl" data/buildings.jsonl
 fi
 if [ ! -f data/dem.json ]; then
   echo "標高タイルを取得…"
-  python3 -I scripts/prep_dem.py "$TMP/dem_tiles" data/dem.json
+  python3 -I scripts/prep_dem.py "$TMP/dem_tiles" "$TMP/dem.json"
+  mv "$TMP/dem.json" data/dem.json
 fi
 
 echo "Blender で組み立て…"
-"$BLENDER" -b --factory-startup --python scripts/build.py -- \
+"$BLENDER" -b --factory-startup --python-exit-code 1 --python scripts/build.py -- \
   "$PWD/data/osm_raw.json" "$PWD/data/dem.json" "$PWD/data/buildings.jsonl" "$PWD/output" > output/blender_stdout.txt 2>&1
 cat output/build_log.txt
 
 echo "検査…"
-"$BLENDER" -b output/bandobashi_3dmap.blend --python scripts/check.py 2>&1 | grep "検査"
+# 検査に通らなければ（道路が地面に埋もれている等）ここで止まる
+"$BLENDER" -b output/bandobashi_3dmap.blend --python-exit-code 1 --python scripts/check.py > output/check_log.txt 2>&1 || { grep -E "検査|不合格|Error" output/check_log.txt; echo "検査に失敗したため中止しました"; exit 1; }
+grep -E "検査|合格" output/check_log.txt
 
 echo "Web 用の軽量版…"
 mkdir -p output/glb_web

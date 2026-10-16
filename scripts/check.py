@@ -18,7 +18,11 @@ def below(tree, p):
     return hit[0].z if hit[0] is not None else None
 
 
-def check(obj, ref, need, step=7):
+FAIL = []
+
+
+def check(obj, ref, need, step=7, limit=0.0):
+    """limit: 許容する不良の割合（%）。超えたら不合格"""
     """obj の面の中心と辺の中点で、真下の ref との高さの差を測る"""
     tree = bvh(ref)
     me = bpy.data.objects[obj].data
@@ -41,6 +45,8 @@ def check(obj, ref, need, step=7):
                 BAD.append((gap, round(q.x), round(q.y), round(q.z, 1)))
     print(f"[検査] {obj} と {ref}: {total} 点中 {bad} 点 ({bad / max(total, 1) * 100:.2f}%) が {need}m 未満の差"
           f" / 最悪 {worst:.2f}m", flush=True)
+    if bad / max(total, 1) * 100 > limit:
+        FAIL.append(f"{obj}: {bad}/{total}")
     BAD.sort()
     print("   悪い所（差, x, y, z）:", BAD[:8])
     import collections
@@ -50,5 +56,10 @@ def check(obj, ref, need, step=7):
 check("road_surface", "terrain", 0.02)
 check("road_sidewalk", "terrain", 0.02)
 check("road_footpath", "terrain", 0.02)
-check("marking_lane_white", "road_surface", 0.02, step=3)
-check("marking_crosswalk", "road_surface", 0.02, step=3)
+check("marking_lane_white", "road_surface", 0.02, step=3, limit=2.0)
+check("marking_crosswalk", "road_surface", 0.02, step=3, limit=2.0)
+
+if FAIL:
+    print("[検査] 不合格:", FAIL, flush=True)
+    raise SystemExit(1)
+print("[検査] 合格（道路の埋もれ0件、白線の隠れ2%以下）", flush=True)
